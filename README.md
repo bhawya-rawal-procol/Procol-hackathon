@@ -1,11 +1,14 @@
 # Vendor Intelligence — prototype
 
-One **Vendor-360** fact layer, two consumers:
+One **Vendor-360** fact layer, one consumer: **the vendor**.
 
-| Persona | What they get |
-|---|---|
-| **Buyer** | Ranked vendor recommendations with reason codes · pre-publish participation forecast · vendor scorecard (90d / 365d / all, delivery trend) · discovery slot for never-invited vendors |
-| **Vendor** | **Chat assistant** over their own record · "Why did I lose?" post-mortem per event · my winning price band (own history only) · participation habits · technical weak spots · counter-offer coaching · profile completeness |
+Vendors on Procol get notifications and nothing else. They lose an event and never learn why. This
+prototype gives them: a **chat assistant** over their own record · a **"Why did I lose?"** post-mortem
+per event · **my winning price band** from their own history · participation habits · technical weak
+spots · counter-offer coaching · profile completeness.
+
+The same fact layer would feed a buyer-side ranker. That half was built and then cut to keep this
+prototype about one persona; it is in git history at the tag `buyer-persona` (`git show buyer-persona`).
 
 Everything runs on **synthetic, Procol-shaped data** with seven planted vendor stories (see below).
 No external systems. Works offline.
@@ -24,12 +27,12 @@ in `tests/test_postmortem_and_api.py` prove it. **If those tests fail, the produ
 
 ```bash
 pip install -r requirements.txt      # Flask, numpy, scikit-learn, requests (pytest optional)
-./run.sh demo                         # seed → build-facts → train → serve on http://127.0.0.1:8000
+./run.sh demo                         # seed → build-facts → serve on http://127.0.0.1:8000
 ./run.sh test                         # 50 tests (pytest if installed, else unittest)
 ```
 
 `make demo` / `make test` do the same if you prefer make (the Makefile is in the git bundle — see below).
-Individual steps: `./run.sh seed`, `build-facts`, `train`, `serve`. Then open `DEMO.md`.
+Individual steps: `./run.sh seed`, `build-facts`, `serve`. Then open `DEMO.md`.
 
 Git history: `git clone vendor-intelligence.bundle vendor-intelligence-git` gives you the six step commits.
 
@@ -90,27 +93,23 @@ demo never dead-ends, not as the product.
 | Post-mortem checks (price / timing / technical / terms) | **No** | `vi/postmortem/checks.py` |
 | Post-mortem narration | **Yes (LLM, optional)** — template fallback | `vi/postmortem/narrator.py` |
 | Winning price band | **No** — bucketed win rates over own bids | `vi/priceband.py` |
-| Buyer ranker `P(bid & top-3)` and forecast `P(bid)` | **Yes (ML)** — logistic regression / GBM, time-split validated | `vi/ranker/` |
-| Reason codes | **No** — feature attribution templated with real numbers | `vi/ranker/reasons.py` |
-| Discovery slot | **No** — SQL over category activity with other buyers | `vi/ranker/serve.py` |
-| Participation forecast | **No** — Σ P(bid) vs threshold | `vi/forecast.py` |
 | Vendor chat — tools | **No** — scoped SQL, guarded | `vi/chat/tools.py` |
 | Vendor chat — Claude engine | **Yes (LLM)** — tool-use over the scoped tools; the product path | `vi/chat/llm.py` |
 | Vendor chat — fallback engine | **No** — intent router, only when no key is set | `vi/chat/offline.py` |
 
-Honest model numbers on the synthetic data (out-of-time test, last 30% of events):
-`P(bid)` AUC ≈ 0.71, `P(bid & top-3)` AUC ≈ 0.76. See `data/models/metrics.json` after `make train`.
-These describe the prototype, not Procol.
+There is **no trained model in the vendor product**. The only AI is the chat engine and the optional
+post-mortem narration, and both only ever see data the guard has already passed. Everything a vendor
+reads — the post-mortem checks, the price band, the habits — is deterministic SQL.
 
 ## Planted stories (`vi/seed/archetypes.py`)
 
 | Vendor | Story | Where it shows |
 |---|---|---|
 | **V-LATE** Rathi Metallurgicals | competitive prices, replies to counter-offers after the window ~80% of the time | vendor post-mortem "timing: high", habits "windows missed 82%" |
-| **V-HIGH** Omkar Industrial | 7–10% above L1 in Steel, competitive in Packaging | ranker reason "avg 10% above L1 in Steel"; price band 0 wins above 6% |
+| **V-HIGH** Omkar Industrial | 7–10% above L1 in Steel, competitive in Packaging | price band: 0 wins above 6% gap in Steel, half its bids win inside 3% |
 | **V-TECHWEAK** Kaveri Chem & Spares | L1 on price, `quality_certifications` < 40% | post-mortem "technical: high", habits weakest section |
-| **V-GHOST** Vidyut Traders | opens 30% of mails, rarely bids, declines for "insufficient lead time" | habits, forecast P(bid) low |
-| **V-STAR** Shakti Enterprises | high participation, 95% on-time | ranker #1 with reasons |
+| **V-GHOST** Vidyut Traders | opens 30% of mails, rarely bids, declines for "insufficient lead time" | habits panel: low open rate, decline reasons |
+| **V-STAR** Shakti Enterprises | high participation, 95% on-time | the healthy record to contrast the others against |
 | **V-SLIPPING** Meridian Freight & Pack | strong a year ago, delivery sliding | scorecard trend −30 pp |
 | **V-NEVERINVITED** Sagar Speciality Chemicals | supplies Chemicals to buyers A & B, never invited by C | buyer C discovery slot |
 
@@ -126,13 +125,11 @@ vi/facts/                    the Vendor-360 SQL and its idempotent builder
 vi/guard.py                  ConfidentialityGuard
 vi/postmortem/               checks.py · narrator.py · service.py
 vi/priceband.py              own-history price band, buyer purchase band (k-anonymised)
-vi/ranker/                   features.py · train.py · reasons.py · serve.py
-vi/forecast.py               participation forecast
 vi/chat/                     tools.py · offline.py · llm.py · service.py — the vendor assistant
 vi/api.py, vi/vendor_views.py, ui/     Flask API + single-page demo UI
-tests/                       50 tests; conftest_db.py seeds a fresh DB once per run
+tests/                       60 tests; conftest.py isolates .env, conftest_db.py seeds a fresh DB once per run
 PORTING.md                   prototype table/query → real Procol table
-DEMO.md                      6-minute click path
+DEMO.md                      4-minute click path
 ```
 
 ## Rules the prototype follows
@@ -140,7 +137,7 @@ DEMO.md                      6-minute click path
 - **Deterministic first.** AI only where interpretation or prediction is needed. Every other component is labelled "no AI".
 - **Nothing autonomous.** Recommendations only. Every output is written to `audit_log` with inputs and the guard's decisions.
 - **Procol-shaped.** Table and column names mirror Procol so the port is mechanical (`PORTING.md`).
-- **Point-in-time safe.** The fact SQL takes an `:until` parameter; the ranker trains on features computed as of each event's `bid_start_time`, so it never sees the future.
+- **Point-in-time safe.** The fact SQL takes an `:until` parameter, so any window can be rebuilt as of a past date without leaking the future into it.
 
 ## Stack note
 

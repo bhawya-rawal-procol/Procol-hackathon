@@ -110,12 +110,17 @@ class ApiConfidentiality(unittest.TestCase):
         v = vendor_id(self.c, "V-LATE")
         tr = lost_event_for(self.c, v)
         buyer = self.c.execute("SELECT eg.company_id FROM trade_requests tr JOIN event_groups eg ON eg.id=tr.event_group_id WHERE tr.id=?", (tr,)).fetchone()[0]
+        def set_policy(policy):
+            """The buyer sets this in Procol; the prototype is vendor-only, so write it directly."""
+            self.c.execute("UPDATE event_groups SET vendor_feedback_policy=? WHERE company_id=?", (policy, buyer))
+            self.c.commit()
+
         before = self.client.get(f"/api/vendor/{v}/events/{tr}/postmortem?force=1").get_json()
         self.assertTrue(before["available"])
-        self.client.put(f"/api/buyer/{buyer}/policy", json={"policy": "none"})
+        set_policy("none")
         after = self.client.get(f"/api/vendor/{v}/events/{tr}/postmortem?force=1").get_json()
         self.assertFalse(after["available"])
-        self.client.put(f"/api/buyer/{buyer}/policy", json={"policy": "relative_plus_technical"})
+        set_policy("relative_plus_technical")
         restored = self.client.get(f"/api/vendor/{v}/events/{tr}/postmortem?force=1").get_json()
         self.assertTrue(restored["available"])
 

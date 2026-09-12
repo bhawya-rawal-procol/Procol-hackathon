@@ -9,62 +9,12 @@
 <body>
 <header class="top">
   <div class="brand">Vendor Intelligence <span class="tag">prototype · synthetic data</span></div>
-  <div class="persona" role="tablist">
-    <button id="tab-buyer" class="on" data-persona="buyer">Buyer</button>
-    <button id="tab-vendor" data-persona="vendor">Vendor</button>
-  </div>
   <div class="who">
-    <label id="who-buyer">Buyer <select id="buyer-select"></select></label>
-    <label id="who-vendor" hidden>Vendor <select id="vendor-select"></select></label>
+    <label id="who-vendor">Vendor <select id="vendor-select"></select></label>
   </div>
 </header>
 
-<!-- ================= BUYER ================= -->
-<main id="buyer-view" class="grid">
-  <aside class="col">
-    <h2>Events</h2>
-    <ul id="buyer-events" class="list"></ul>
-    <div class="card policy">
-      <h3>Vendor feedback policy</h3>
-      <p class="muted">What vendors may learn from your closed events.</p>
-      <div id="policy-radios">
-        <label><input type="radio" name="policy" value="none"> none</label>
-        <label><input type="radio" name="policy" value="relative_only"> relative only</label>
-        <label><input type="radio" name="policy" value="relative_plus_technical"> relative + technical</label>
-      </div>
-    </div>
-  </aside>
-  <section class="col wide">
-    <div id="buyer-empty" class="card muted">Pick an event on the left. Draft events show recommendations and a participation forecast.</div>
-    <div id="reco" hidden>
-      <div class="rowhead">
-        <h2 id="reco-title"></h2>
-        <span id="reco-meta" class="muted"></span>
-      </div>
-      <div class="card forecast">
-        <div class="rowhead">
-          <strong>Participation forecast</strong>
-          <button id="btn-forecast">Forecast for selected</button>
-        </div>
-        <p id="forecast-msg" class="muted">Tick vendors to invite, then forecast. Rule: at least <span id="thr">3</span> expected bids.</p>
-        <div id="forecast-suggest"></div>
-      </div>
-      <table class="tbl" id="reco-table">
-        <thead><tr><th></th><th>#</th><th>Vendor</th><th>Score</th><th>P(bid)</th><th>Why</th></tr></thead>
-        <tbody></tbody>
-      </table>
-      <div class="card discovery">
-        <h3>Discovery <span class="muted">— never invited by you, active with other buyers</span></h3>
-        <ul id="discovery"></ul>
-      </div>
-      <p class="fine" id="model-note"></p>
-    </div>
-  </section>
-  <aside class="col drawer" id="scorecard" hidden></aside>
-</main>
-
-<!-- ================= VENDOR ================= -->
-<main id="vendor-view" class="grid" hidden>
+<main id="vendor-view" class="grid">
   <aside class="col">
     <div id="habits" class="card"></div>
     <div id="profile" class="card"></div>

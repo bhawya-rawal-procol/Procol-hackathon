@@ -1,78 +1,63 @@
-# DEMO — a six-minute click path
+# DEMO — a four-minute click path (vendor)
 
-Run `make demo`, open http://127.0.0.1:8000. The page opens in the **Buyer** persona on
-**Apex Steelworks Ltd** with the draft **"Steel RFQ — Q4 structural requirement"** already selected.
+Run `make demo`, open http://127.0.0.1:8010. One page, one persona: the **vendor**.
+The vendor picker is top-right; archetypes are labelled so you know what each one's story is.
+
+The product answers a question vendors on Procol have never been able to ask: *why did I lose, and
+what do I change next time?* Everything on the page is the vendor's own record or a relative
+position. A competitor's price, name or rank never reaches this page.
 
 ---
 
-### 1. Buyer: who should I invite? (90 s)
+### 1. The habit that costs the money (60 s)
 
-- The table is the ranked recommendation for this Steel RFQ. **Shakti Enterprises (V-STAR) is #1** —
-  read the reasons out loud: *"bid on 10 of last 10 Steel invites · avg 1.3% above L1 in Steel · first bid in ~5h"*.
-- Scroll to **Omkar Industrial Supplies (V-HIGH)** near the bottom — its red reason says
-  *"avg 10% above L1 in Steel"*. Same vendor is competitive in Packaging; the model knows the difference.
-- Point at the **Score** bar vs **P(bid)** column: score is *P(bid AND top-3 on price)*; P(bid) alone feeds the forecast.
-- Footer line: the ranker's honest out-of-time AUC. Say the number. Say it is synthetic.
+- Choose **Rathi Metallurgicals Pvt Ltd · V-LATE**.
+- Left panel, **My habits**: *"Counter-offer windows missed: 82%"* in red. That is the whole story in
+  one number, and it is a number no vendor can see today.
+- Around it: invites, bid rate, mail open rate, first-bid response time, average gap to L1, extensions
+  they caused, on-time delivery with a 90d-vs-365d trend, and the reasons they gave for declining.
+- Under it, **profile completeness** — missing documents and pending onboardings.
 
-### 2. Buyer: will enough vendors show up? (60 s)
+### 2. Why did I lose? (90 s)
 
-- Untick the top five, tick the **bottom three**, press **Forecast for selected**.
-- Red message: *"1.5 bids expected from 3 vendors — below the 3-bid rule. Add 2 more to reach ~3.3."*
-- Click the two suggested **+ vendor** buttons — they tick themselves and the forecast turns green.
-- This is what Clara's `bid_sufficiency_rules` check *after* the event closes; here it runs *before* publish.
-
-### 3. Buyer: vendor scorecard (30 s)
-
-- Click **Meridian Freight & Pack (V-SLIPPING)** in any Packaging/Logistics event, or search it in another
-  buyer's event. The drawer shows 90d / 365d / all, and **Delivery trend: −30 pp** in red.
-
-### 4. Buyer: discovery (30 s)
-
-- Switch buyer to **Coastal Chemicals Pvt Ltd**, pick its draft **"Chemicals RFQ"**.
-- The **Discovery** box lists **Sagar Speciality Chemicals (V-NEVERINVITED)**:
-  *"Active in Chemicals with 2 other buyers (9 events). Never invited by you."*
-  No buyer names, no prices — just the fact that a qualified vendor exists outside this tenant's network.
-
-### 5. Vendor: why did I lose? (90 s)
-
-- Toggle to **Vendor**, choose **Rathi Metallurgicals Pvt Ltd · V-LATE**.
-- Left panel, **My habits**: *"Counter-offer windows missed: 82%"* in red. That is the whole story in one number.
+- Centre column is **My events** — won, lost, or no bid, tagged **MISSED WINDOW** where it applies and
+  **NO FEEDBACK** where the buyer does not share any.
 - Click any **LOST · MISSED WINDOW** event from **Apex Steelworks** or **Bharat Packaging**.
 - Read the post-mortem: *"The main factor was timing. The buyer sent a counter-offer with a 24h window;
-  your reply arrived 10h after it closed."* Then **Next time:** a same-day rule for counter-offers.
-- Point out the four check cards (timing / price / technical / terms) with severities, and the footer:
-  *"Confidentiality guard removed N item(s). Nothing about other vendors is shown here."*
+  your reply arrived 49h after it closed."* Then **Next time:** a same-day rule for counter-offers.
+- Point out the four check cards — timing, price, technical, terms — each with a severity and the
+  evidence behind it. Price is stated only as a gap: *"2.0% above L1, rank 2 of 4"*.
+- Footer: *"Confidentiality guard removed N item(s). Nothing about other vendors is shown here."*
 
-### 5b. Vendor: just ask (90 s)
+### 3. My winning price band (30 s)
 
-- Top-right panel **Ask about my record**. Click **connect Claude**, paste your Anthropic API key, **Connect** —
-  the badge turns green. (Skip this and a fixed-answer fallback engine responds instead.)
-- Now ask anything about the vendor's own record, in your own words — e.g. *"what did I quote on the Steel RFQ in
-  July and what did the buyer ask for?"*, *"am I getting better this quarter?"*, *"which category should I focus on?"*.
+- Right column: per category, win rate by **% gap to L1** bucket, computed from this vendor's own bids only.
+- Switch to **Omkar Industrial Supplies · V-HIGH**: Steel shows **0 wins in the 6–10% and >10% buckets
+  across 9 bids**, while inside 3% it wins half. The vendor learns exactly where its price has to be
+  without ever seeing a competitor's number.
+
+### 4. Just ask it (90 s)
+
+- Top-right panel, **Ask about my record**. The badge shows the live engine (Groq by default, set in
+  `.env`). With no key it answers deterministically instead — the demo never breaks.
 - Click **"Which events did I lose recently?"** — a list with buyers and dates.
-- Type **"why did I lose the steel rfq in july?"** — it finds the event and gives the timing story plus a next step,
-  and shows `used: my_events, why_did_i_lose` under the answer.
-- Type **"who won it and what was the L1 price?"** — explicit refusal: it will never show other vendors' prices or names.
-- Type **"how am I doing with Coastal Chemicals?"** — it answers with numbers and notes that this buyer shares no event feedback.
-- Footer of the panel says which engine is running: *offline engine* (deterministic) or *Claude* (with an API key).
+- Type **"why did I lose the steel rfq in july?"** — it finds the event, gives the timing story and a
+  next step, and shows `used: my_events, why_did_i_lose` under the answer.
+- Type **"who won it and what was the L1 price?"** — a flat refusal: *"I don't have the other vendor's
+  name or quoted price."* followed by the relative view it is allowed to give.
+- Type **"how am I doing with Coastal Chemicals?"** — numbers, plus a note that this buyer shares no
+  event feedback.
 
-### 6. Vendor: my winning price band (30 s)
+### 5. The guard, live (30 s)
 
-- Right panel: per category, win rate by **% gap to L1** bucket — computed only from this vendor's own bids.
-- Switch vendor to **Omkar Industrial Supplies · V-HIGH**: Steel shows **0% wins in the 6–10% and >10% buckets**
-  with n≥5. The vendor learns where its price needs to be without ever seeing a competitor's number.
-
-### 7. The guard, live (45 s)
-
-- Still on V-LATE, click a **LOST** event from **Coastal Chemicals** (tagged **NO FEEDBACK**).
-  The card is blocked: *"This buyer's feedback policy is none."*
-- Go back to **Buyer → Apex Steelworks**, change **Vendor feedback policy** to **none**.
-- Return to **Vendor → V-LATE**, click the same Apex event you read in step 5. It is now blocked too.
-  Set the policy back to **relative + technical** and it returns.
-- Set it to **relative only**: the technical card disappears, price/timing/terms stay.
+- Still on V-LATE, click a **LOST** event from **Coastal Chemicals**, tagged **NO FEEDBACK**.
+  The card is blocked: *"This buyer's feedback policy is none."* and names the guard action that did it.
+- That policy is the buyer's switch, per tenant, with three settings. `none` blanks the card entirely.
+  `relative_only` keeps price, timing and terms but drops the technical card. `relative_plus_technical`
+  shows everything you just read. Flip it in the database and reload to show all three.
 
 ---
 
-**Closing line:** everything in the buyer view and the vendor view is one fact table with two lenses.
-The fact table is SQL. The guard is a pure function with tests. The only models are the ranker and the
-optional narrator — and both are labelled as such.
+**Closing line:** one SQL fact table, one guard, one vendor lens. The guard is a pure function with
+tests that prove a competitor's price, name or rank cannot appear in any vendor-facing payload. The
+only model is the optional narrator behind the chat, and it only ever sees data the guard already passed.

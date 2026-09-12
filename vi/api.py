@@ -14,11 +14,9 @@ from flask import Flask, abort, jsonify, request, send_from_directory
 
 from . import audit
 from .db import DEFAULT_DB, connect, one, rows
-from .forecast import forecast
 from .guard import ConfidentialityGuard
 from .postmortem.service import build_post_mortem
 from .priceband import buyer_purchase_band, winning_price_band
-from .ranker.serve import models_ready, rank_for_event
 from .vendor_views import vendor_events, vendor_habits, vendor_profile_card
 from .chat.service import chat as chat_turn, greeting as chat_greeting, history as chat_history, connect_claude, engine_status
 
@@ -45,72 +43,9 @@ def ui_asset(name: str):
 @app.get("/api/meta")
 def meta():
     c = db()
-    m = json.loads(Path("data/models/metrics.json").read_text()) if models_ready() else None
     return jsonify({
-        "buyers": rows(c, "SELECT id, name FROM companies WHERE category='buyer' ORDER BY id"),
         "vendors": rows(c, "SELECT id, name, archetype FROM companies WHERE category='vendor' ORDER BY (archetype='generic'), name"),
-        "policies": {r["company_id"]: r["policy"] for r in rows(c, "SELECT company_id, MAX(vendor_feedback_policy) AS policy FROM event_groups GROUP BY 1")},
-        "models_ready": models_ready(), "model_metrics": m["models"] if m else None,
     })
-
-
-# ----------------------------------------------------------------------------- buyer
-@app.get("/api/buyer/<int:buyer>/events")
-def buyer_events(buyer: int):
-    c = db()
-    return jsonify(rows(c, """
-        SELECT tr.id AS trade_request_id, eg.title, tr.rfx_mode, tr.status, tr.bid_start_time, tr.bid_end_time,
-               eg.vendor_feedback_policy AS policy,
-               (SELECT pc.name FROM trade_products tp JOIN products p ON p.id=tp.product_id
-                 JOIN product_categories pc ON pc.id=p.product_category_id WHERE tp.trade_request_id=tr.id LIMIT 1) AS category,
-               (SELECT COUNT(*) FROM audiences a WHERE a.trade_request_id=tr.id) AS invited,
-               (SELECT COUNT(DISTINCT vendor_company_id) FROM bids b WHERE b.trade_request_id=tr.id) AS bidders
-        FROM trade_requests tr JOIN event_groups eg ON eg.id=tr.event_group_id
-        WHERE eg.company_id=? ORDER BY tr.status='draft' DESC, tr.bid_start_time DESC LIMIT 40""", (buyer,)))
-
-
-@app.get("/api/buyer/<int:buyer>/events/<int:tr>/recommendations")
-def recommendations(buyer: int, tr: int):
-    if not models_ready():
-        abort(503, "models not trained — run `make train`")
-    c = db()
-    out = rank_for_event(c, tr, buyer)
-    audit.log(c, "buyer", buyer, "rank_vendors", {"trade_request_id": tr}, None, [r["vendor_id"] for r in out["ranked"]])
-    return jsonify(out)
-
-
-@app.post("/api/buyer/<int:buyer>/events/<int:tr>/forecast")
-def forecast_route(buyer: int, tr: int):
-    body = request.get_json(force=True) or {}
-    c = db()
-    out = forecast(c, tr, buyer, [int(v) for v in body.get("vendor_ids", [])], int(body.get("threshold", 3)))
-    audit.log(c, "buyer", buyer, "participation_forecast", body, None, out["expected_bids"])
-    return jsonify(out)
-
-
-@app.get("/api/buyer/<int:buyer>/vendors/<int:vendor>/scorecard")
-def scorecard(buyer: int, vendor: int):
-    c = db()
-    v = one(c, "SELECT id, name, archetype FROM companies WHERE id=?", (vendor,)) or abort(404)
-    prof = {w: one(c, "SELECT * FROM vendor_profiles WHERE buyer_company_id=? AND vendor_company_id=? AND category_id=0 AND window=?",
-                   (buyer, vendor, w)) for w in ("90d", "365d", "all")}
-    overall = {w: one(c, "SELECT * FROM vendor_profiles WHERE buyer_company_id=0 AND vendor_company_id=? AND category_id=0 AND window=?",
-                      (vendor, w)) for w in ("90d", "365d", "all")}
-    cats = rows(c, """SELECT pc.name AS category, vp.* FROM vendor_profiles vp JOIN product_categories pc ON pc.id=vp.category_id
-                      WHERE vp.buyer_company_id=0 AND vp.vendor_company_id=? AND vp.window='all' AND vp.category_id<>0""", (vendor,))
-    return jsonify({"vendor": v, "with_you": prof, "overall": overall, "by_category": cats})
-
-
-@app.put("/api/buyer/<int:buyer>/policy")
-def set_policy(buyer: int):
-    policy = (request.get_json(force=True) or {}).get("policy")
-    if policy not in ("none", "relative_only", "relative_plus_technical"):
-        abort(400, "bad policy")
-    c = db()
-    c.execute("UPDATE event_groups SET vendor_feedback_policy=? WHERE company_id=?", (policy, buyer))
-    c.commit()
-    audit.log(c, "buyer", buyer, "set_vendor_feedback_policy", {"policy": policy}, None, policy)
-    return jsonify({"buyer": buyer, "policy": policy})
 
 
 # ----------------------------------------------------------------------------- vendor (guarded)

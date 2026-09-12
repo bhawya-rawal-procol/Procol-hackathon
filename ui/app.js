@@ -5,121 +5,17 @@ const pct = (v) => v == null ? "—" : Math.round(v * 100) + "%";
 const num = (v, d = 1) => v == null ? "—" : Number(v).toFixed(d);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-const state = { persona: "buyer", buyer: null, vendor: null, tr: null, reco: null, meta: null };
+const state = { vendor: null, meta: null };
 
 // ------------------------------------------------------------------ boot
 (async function boot() {
   state.meta = await api("/api/meta");
-  $("#buyer-select").innerHTML = state.meta.buyers.map((b) => `<option value="${b.id}">${esc(b.name)}</option>`).join("");
   $("#vendor-select").innerHTML = state.meta.vendors.map((v) =>
     `<option value="${v.id}">${esc(v.name)}${v.archetype !== "generic" ? "  ·  " + v.archetype : ""}</option>`).join("");
-  state.buyer = +$("#buyer-select").value;
   state.vendor = +$("#vendor-select").value;
-  $("#model-note").textContent = state.meta.models_ready
-    ? `Ranker: ${state.meta.model_metrics.p_top3.chosen}, out-of-time test AUC ${state.meta.model_metrics.p_top3.test_auc[state.meta.model_metrics.p_top3.chosen]} (P(bid & top-3)); forecast uses P(bid) AUC ${state.meta.model_metrics.p_bid.test_auc[state.meta.model_metrics.p_bid.chosen]}. Synthetic data — these numbers describe the prototype, not Procol.`
-    : "Models not trained — run `make train`.";
-  document.querySelectorAll(".persona button").forEach((b) => b.onclick = () => setPersona(b.dataset.persona));
-  $("#buyer-select").onchange = (e) => { state.buyer = +e.target.value; loadBuyer(); };
   $("#vendor-select").onchange = (e) => { state.vendor = +e.target.value; loadVendor(); };
-  document.querySelectorAll('#policy-radios input').forEach((r) => r.onchange = () => setPolicy(r.value));
-  $("#btn-forecast").onclick = runForecast;
-  loadBuyer();
+  loadVendor();
 })();
-
-function setPersona(p) {
-  state.persona = p;
-  document.querySelectorAll(".persona button").forEach((b) => b.classList.toggle("on", b.dataset.persona === p));
-  $("#buyer-view").hidden = p !== "buyer"; $("#vendor-view").hidden = p !== "vendor";
-  $("#who-buyer").hidden = p !== "buyer"; $("#who-vendor").hidden = p !== "vendor";
-  if (p === "vendor") loadVendor();
-}
-
-// ------------------------------------------------------------------ buyer
-async function loadBuyer() {
-  const policy = state.meta.policies[state.buyer] || "relative_only";
-  document.querySelectorAll('#policy-radios input').forEach((r) => r.checked = r.value === policy);
-  const evs = await api(`/api/buyer/${state.buyer}/events`);
-  $("#buyer-events").innerHTML = evs.map((e) => `
-    <li data-tr="${e.trade_request_id}" data-status="${e.status}">
-      <span class="t">${esc(e.title)}</span><span class="pill ${e.status}">${e.status}</span>
-      <span class="s">${esc(e.category)} · ${e.rfx_mode.toUpperCase()} · ${e.status === "draft" ? "not yet published" : `${e.invited} invited, ${e.bidders} bid`}</span>
-    </li>`).join("");
-  document.querySelectorAll("#buyer-events li").forEach((li) => li.onclick = () => pickEvent(+li.dataset.tr, li));
-  $("#reco").hidden = true; $("#buyer-empty").hidden = false; $("#scorecard").hidden = true;
-  const first = document.querySelector('#buyer-events li[data-status="draft"]');
-  if (first) pickEvent(+first.dataset.tr, first);
-}
-
-async function setPolicy(policy) {
-  await api(`/api/buyer/${state.buyer}/policy`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ policy }) });
-  state.meta.policies[state.buyer] = policy;
-}
-
-async function pickEvent(tr, li) {
-  document.querySelectorAll("#buyer-events li").forEach((x) => x.classList.toggle("sel", x === li));
-  state.tr = tr;
-  $("#buyer-empty").hidden = true; $("#reco").hidden = false;
-  $("#reco-title").textContent = li.querySelector(".t").textContent;
-  $("#reco-meta").textContent = "scoring vendors…";
-  $("#reco-table tbody").innerHTML = ""; $("#discovery").innerHTML = ""; $("#forecast-msg").innerHTML = "Tick vendors to invite, then forecast. Rule: at least 3 expected bids."; $("#forecast-suggest").innerHTML = "";
-  const r = await api(`/api/buyer/${state.buyer}/events/${tr}/recommendations`);
-  state.reco = r;
-  $("#reco-meta").textContent = `${r.category} · ${r.ranked.length} eligible vendors · lot value ₹${Math.round(r.lot_value).toLocaleString("en-IN")} · ${r.lead_days} days to bid`;
-  $("#reco-table tbody").innerHTML = r.ranked.map((v) => `
-    <tr>
-      <td><input type="checkbox" class="inv" value="${v.vendor_id}" ${v.rank <= 5 ? "checked" : ""}></td>
-      <td class="num">${v.rank}</td>
-      <td><span class="name" data-v="${v.vendor_id}">${esc(v.name)}</span>${v.archetype !== "generic" ? `<span class="arch">${v.archetype}</span>` : ""}${v.cold_start ? `<span class="arch">no history — cold start</span>` : ""}</td>
-      <td class="num"><span class="bar"><i style="width:${Math.round(v.score * 100)}%"></i></span>${num(v.score, 2)}</td>
-      <td class="num">${num(v.p_bid, 2)}</td>
-      <td class="why">${v.reasons.map((x) => `<span class="${x.direction === "-" ? "neg" : ""}">${esc(x.text)}</span>`).join(" · ")}</td>
-    </tr>`).join("");
-  document.querySelectorAll("#reco-table .name").forEach((n) => n.onclick = () => showScorecard(+n.dataset.v));
-  $("#discovery").innerHTML = r.discovery.length ? r.discovery.map((d) => `
-    <li><strong>${esc(d.name)}</strong> ${d.archetype !== "generic" ? `<span class="pill">${d.archetype}</span>` : ""}<br><span class="muted">${esc(d.note)}</span></li>`).join("")
-    : `<li class="muted">No unmapped vendors active in ${esc(r.category)} with 2+ other buyers.</li>`;
-}
-
-async function runForecast() {
-  const ids = [...document.querySelectorAll(".inv:checked")].map((c) => +c.value);
-  $("#forecast-msg").textContent = "forecasting…";
-  const f = await api(`/api/buyer/${state.buyer}/events/${state.tr}/forecast`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ vendor_ids: ids }) });
-  $("#forecast-msg").innerHTML = `<strong style="color:${f.sufficient ? "var(--ok)" : "var(--crit)"}">${esc(f.message)}</strong>`;
-  $("#forecast-suggest").innerHTML = f.suggestions.length ? `<div class="sugg">${f.suggestions.map((s) =>
-    `<button data-v="${s.vendor_id}">+ ${esc(s.name)} <span class="muted">P(bid) ${num(s.p_bid, 2)}</span></button>`).join("")}</div>` : "";
-  document.querySelectorAll("#forecast-suggest button").forEach((b) => b.onclick = () => {
-    const cb = document.querySelector(`.inv[value="${b.dataset.v}"]`); if (cb) cb.checked = true; runForecast();
-  });
-}
-
-async function showScorecard(vid) {
-  const s = await api(`/api/buyer/${state.buyer}/vendors/${vid}/scorecard`);
-  const row = (label, key, fmt = pct) => {
-    const g = (o) => (o ? fmt(o[key]) : "—");
-    return `<div class="h">${label}</div><div class="num">${g(s.with_you["90d"])}</div><div class="num">${g(s.with_you["365d"])}</div><div class="num">${g(s.with_you["all"])}</div>`;
-  };
-  const tr = s.overall.all && s.overall.all.trend_90d_vs_365d;
-  $("#scorecard").hidden = false;
-  $("#scorecard").innerHTML = `
-    <div class="card">
-      <h3>Vendor scorecard</h3>
-      <h2>${esc(s.vendor.name)} ${s.vendor.archetype !== "generic" ? `<span class="pill">${s.vendor.archetype}</span>` : ""}</h2>
-      <p class="muted" style="margin:0 0 8px">With you · by window</p>
-      <div class="kv">
-        <div class="h"></div><div class="h">90d</div><div class="h">365d</div><div class="h">all</div>
-        ${row("Invites", "invites", (v) => v ?? "—")}${row("Bid rate", "bid_rate")}${row("Win rate", "win_rate")}
-        ${row("Gap to L1", "avg_gap_to_l1_pct", (v) => v == null ? "—" : num(v) + "%")}
-        ${row("Late counter-offer replies", "late_counter_offer_rate")}${row("On-time delivery", "on_time_delivery_rate")}${row("QC pass", "qc_pass_rate")}
-        ${row("Technical avg", "avg_technical_pct", (v) => v == null ? "—" : Math.round(v) + "%")}
-      </div>
-      <p style="margin-top:10px">Delivery trend (all buyers, 90d vs 365d): <span class="trend ${tr < -5 ? "down" : tr > 5 ? "up" : ""}">${tr == null ? "—" : (tr > 0 ? "+" : "") + tr + " pp"}</span></p>
-      <h3 style="margin-top:12px">By category (all buyers)</h3>
-      <div class="kv" style="grid-template-columns:1fr auto auto auto">
-        <div class="h">Category</div><div class="h">Bids</div><div class="h">Win</div><div class="h">Gap</div>
-        ${s.by_category.map((c) => `<div>${esc(c.category)}</div><div class="num">${c.events_bid ?? 0}</div><div class="num">${pct(c.win_rate)}</div><div class="num">${c.avg_gap_to_l1_pct == null ? "—" : num(c.avg_gap_to_l1_pct) + "%"}</div>`).join("")}
-      </div>
-    </div>`;
-}
 
 // ------------------------------------------------------------------ vendor
 async function loadVendor() {
