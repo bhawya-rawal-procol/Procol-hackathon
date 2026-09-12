@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vendor Intelligence — demo</title>
+<link rel="stylesheet" href="/ui/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">Vendor Intelligence <span class="tag">prototype · synthetic data</span></div>
+  <div class="persona" role="tablist">
+    <button id="tab-buyer" class="on" data-persona="buyer">Buyer</button>
+    <button id="tab-vendor" data-persona="vendor">Vendor</button>
+  </div>
+  <div class="who">
+    <label id="who-buyer">Buyer <select id="buyer-select"></select></label>
+    <label id="who-vendor" hidden>Vendor <select id="vendor-select"></select></label>
+  </div>
+</header>
+
+<!-- ================= BUYER ================= -->
+<main id="buyer-view" class="grid">
+  <aside class="col">
+    <h2>Events</h2>
+    <ul id="buyer-events" class="list"></ul>
+    <div class="card policy">
+      <h3>Vendor feedback policy</h3>
+      <p class="muted">What vendors may learn from your closed events.</p>
+      <div id="policy-radios">
+        <label><input type="radio" name="policy" value="none"> none</label>
+        <label><input type="radio" name="policy" value="relative_only"> relative only</label>
+        <label><input type="radio" name="policy" value="relative_plus_technical"> relative + technical</label>
+      </div>
+    </div>
+  </aside>
+  <section class="col wide">
+    <div id="buyer-empty" class="card muted">Pick an event on the left. Draft events show recommendations and a participation forecast.</div>
+    <div id="reco" hidden>
+      <div class="rowhead">
+        <h2 id="reco-title"></h2>
+        <span id="reco-meta" class="muted"></span>
+      </div>
+      <div class="card forecast">
+        <div class="rowhead">
+          <strong>Participation forecast</strong>
+          <button id="btn-forecast">Forecast for selected</button>
+        </div>
+        <p id="forecast-msg" class="muted">Tick vendors to invite, then forecast. Rule: at least <span id="thr">3</span> expected bids.</p>
+        <div id="forecast-suggest"></div>
+      </div>
+      <table class="tbl" id="reco-table">
+        <thead><tr><th></th><th>#</th><th>Vendor</th><th>Score</th><th>P(bid)</th><th>Why</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="card discovery">
+        <h3>Discovery <span class="muted">— never invited by you, active with other buyers</span></h3>
+        <ul id="discovery"></ul>
+      </div>
+      <p class="fine" id="model-note"></p>
+    </div>
+  </section>
+  <aside class="col drawer" id="scorecard" hidden></aside>
+</main>
+
+<!-- ================= VENDOR ================= -->
+<main id="vendor-view" class="grid" hidden>
+  <aside class="col">
+    <div id="habits" class="card"></div>
+    <div id="profile" class="card"></div>
+  </aside>
+  <section class="col wide">
+    <h2>My events</h2>
+    <ul id="vendor-events" class="list"></ul>
+  </section>
+  <aside class="col drawer">
+    <div id="chat" class="card chat">
+      <div class="rowhead"><h3>Ask about my record</h3><button id="chat-reset" class="link">new chat</button></div>
+      <div id="engine-bar" class="enginebar">
+        <span id="engine-badge" class="pill">…</span>
+        <span id="engine-text" class="fine"></span>
+        <button id="engine-toggle" class="link">connect Claude</button>
+      </div>
+      <form id="key-form" class="keyform" hidden>
+        <input id="key-input" type="password" placeholder="Anthropic API key (kept in server memory only)" autocomplete="off">
+        <input id="model-input" type="text" placeholder="model (optional)" autocomplete="off">
+        <button type="submit">Connect</button>
+        <span id="key-msg" class="fine"></span>
+      </form>
+      <div id="chat-log" class="chatlog"></div>
+      <div id="chat-suggest" class="sugg"></div>
+      <form id="chat-form" class="chatform">
+        <input id="chat-input" type="text" placeholder="e.g. why did I lose the Steel RFQ in July?" autocomplete="off">
+        <button type="submit">Send</button>
+      </form>
+    </div>
+    <div id="postmortem" class="card muted">Click a lost event to see why.</div>
+    <div id="priceband" class="card"></div>
+  </aside>
+</main>
+
+<script src="/ui/app.js"></script>
+</body>
+</html>
