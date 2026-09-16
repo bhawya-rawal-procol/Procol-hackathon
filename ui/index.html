@@ -2,53 +2,122 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Vendor Intelligence — demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vendor Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/ui/style.css">
 </head>
 <body>
-<header class="top">
-  <div class="brand">Vendor Intelligence <span class="tag">prototype · synthetic data</span></div>
-  <div class="who">
-    <label id="who-vendor">Vendor <select id="vendor-select"></select></label>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">VI</span><span>Vendor&nbsp;Intelligence</span></div>
+  <span class="divider"></span>
+  <div class="select-wrap">
+    <select id="vendor-select" aria-label="Acting as vendor"></select>
+    <span class="caret">▾</span>
+  </div>
+  <span class="tag">Prototype · synthetic data</span>
+  <div class="top-right">
+    <button class="icon-btn" id="theme-toggle" aria-label="Toggle theme" title="Toggle theme">◐</button>
+    <button class="cta" id="ai-open">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+      Analytics Intelligence
+    </button>
   </div>
 </header>
 
-<main id="vendor-view" class="grid">
-  <aside class="col">
-    <div id="habits" class="card"></div>
-    <div id="profile" class="card"></div>
-  </aside>
-  <section class="col wide">
-    <h2>My events</h2>
-    <ul id="vendor-events" class="list"></ul>
-  </section>
-  <aside class="col drawer">
-    <div id="chat" class="card chat">
-      <div class="rowhead"><h3>Ask about my record</h3><button id="chat-reset" class="link">new chat</button></div>
-      <div id="engine-bar" class="enginebar">
-        <span id="engine-badge" class="pill">…</span>
-        <span id="engine-text" class="fine"></span>
-        <button id="engine-toggle" class="link">connect Claude</button>
-      </div>
-      <form id="key-form" class="keyform" hidden>
-        <input id="key-input" type="password" placeholder="Anthropic API key (kept in server memory only)" autocomplete="off">
-        <input id="model-input" type="text" placeholder="model (optional)" autocomplete="off">
-        <button type="submit">Connect</button>
-        <span id="key-msg" class="fine"></span>
-      </form>
-      <div id="chat-log" class="chatlog"></div>
-      <div id="chat-suggest" class="sugg"></div>
-      <form id="chat-form" class="chatform">
-        <input id="chat-input" type="text" placeholder="e.g. why did I lose the Steel RFQ in July?" autocomplete="off">
-        <button type="submit">Send</button>
-      </form>
+<main class="page">
+  <section class="analytics">
+    <div class="section-head">
+      <h2>Performance overview</h2>
+      <span class="fine" id="scope-note"></span>
     </div>
-    <div id="postmortem" class="card muted">Click a lost event to see why.</div>
-    <div id="priceband" class="card"></div>
-  </aside>
+
+    <div class="kpis" id="kpis"></div>
+
+    <div class="charts">
+      <div class="card span-4" id="card-activity"></div>
+      <div class="card span-4" id="card-funnel"></div>
+      <div class="card span-4" id="card-quality"></div>
+    </div>
+  </section>
+
+  <section class="events">
+    <div class="section-head">
+      <h2>Bid history</h2>
+      <div class="filters" id="event-filters">
+        <button data-f="bid" class="on">Bids placed</button>
+        <button data-f="won">Won</button>
+        <button data-f="lost">Lost</button>
+        <button data-f="skipped">Skipped</button>
+        <button data-f="all">All invites</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="tbl">
+        <thead>
+          <tr><th>Event</th><th>Buyer</th><th>Category</th><th>Mode</th><th>Closed</th><th>Outcome</th><th></th></tr>
+        </thead>
+        <tbody id="events-body"></tbody>
+      </table>
+    </div>
+    <div class="events-foot">
+      <p class="fine" id="events-note"></p>
+      <p class="fine">Select a row for the event post-mortem.</p>
+    </div>
+  </section>
 </main>
 
+<aside class="ai-panel" id="ai-panel" aria-hidden="true">
+  <header class="ai-head">
+    <div>
+      <div class="ai-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        Analytics Intelligence
+      </div>
+      <div class="enginebar">
+        <span id="engine-badge" class="pill">…</span>
+        <button id="engine-toggle" class="link">connect Claude</button>
+        <button id="chat-reset" class="link">new chat</button>
+      </div>
+    </div>
+    <button class="icon-btn" id="ai-close" aria-label="Close">✕</button>
+  </header>
+  <form id="key-form" class="keyform" hidden>
+    <input id="key-input" type="password" placeholder="Anthropic API key — kept in server memory only" autocomplete="off">
+    <div class="keyrow">
+      <input id="model-input" type="text" placeholder="model (optional)" autocomplete="off">
+      <button type="submit">Connect</button>
+    </div>
+    <span id="key-msg" class="fine"></span>
+  </form>
+  <div class="thread" id="thread"><div class="thread-inner" id="chat-log"></div></div>
+  <div class="composer-wrap">
+    <div class="sugg" id="chat-suggest"></div>
+    <form class="composer" id="chat-form">
+      <textarea id="chat-input" rows="1" placeholder="Ask for any cut of your data…" autocomplete="off"></textarea>
+      <button type="submit" id="send-btn" aria-label="Send">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 19V5M12 5l-6 6M12 5l6 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </form>
+    <p class="disclaimer">Answers are built from your own guarded record. Nothing about other vendors is shown.</p>
+  </div>
+</aside>
+
+<div class="modal" id="pm-modal" aria-hidden="true">
+  <div class="modal-card">
+    <button class="icon-btn modal-x" id="pm-close" aria-label="Close">✕</button>
+    <div id="postmortem"></div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
 <script src="/ui/app.js"></script>
 </body>
 </html>
