@@ -144,3 +144,4 @@ DEMO.md                      4-minute click path
 Default spec was FastAPI + pytest. The build environment could not reach PyPI, so the prototype uses **Flask**
 (same shape, already present) and stdlib **unittest** (pytest runs the same files unchanged). Swapping to
 FastAPI is a routing-layer change only — all logic is in plain functions and SQL.
+# Procol-hackathon
