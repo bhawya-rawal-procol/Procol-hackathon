@@ -1,18 +1,24 @@
 """Demo server. Flask, plain JSON, one HTML page. `python -m vi.api --db data/vendor_intelligence.db`
 
-Buyer endpoints never pass through the guard (the buyer owns the event data).
-Vendor endpoints ALWAYS pass through the guard — see vendor_* routes.
+A vendor signs in with mobile + OTP (`vi/auth.py`) and the session carries exactly one
+vendor_company_id. Two layers stand between a vendor and anyone else's data:
+
+  1. the session check below — every /api/vendor/<id>/… route whose id is not the session's is 403,
+     so changing the number in the URL gets you nothing and is written to audit_log;
+  2. the ConfidentialityGuard, unchanged, on every vendor-facing payload.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import re
+import secrets
 from pathlib import Path
 
-from flask import Flask, abort, jsonify, request, send_from_directory
+from flask import Flask, abort, jsonify, redirect, request, send_from_directory, session
 
-from . import audit
+from . import audit, auth
 from .db import DEFAULT_DB, connect, one, rows
 from .guard import ConfidentialityGuard
 from .postmortem.service import build_post_mortem
@@ -22,11 +28,84 @@ from .chat.service import chat as chat_turn, greeting as chat_greeting, history 
 
 UI_DIR = Path(__file__).resolve().parent.parent / "ui"
 app = Flask(__name__, static_folder=None)
+# A fresh key per process signs the session cookie; set VI_SECRET to keep sessions across restarts.
+app.secret_key = os.environ.get("VI_SECRET") or secrets.token_hex(32)
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax")
 DB_PATH = os.environ.get("VI_DB", DEFAULT_DB)
+
+VENDOR_ROUTE = re.compile(r"^/api/vendor/(\d+)(/|$)")
 
 
 def db():
     return connect(DB_PATH)
+
+
+# ----------------------------------------------------------------------------- session
+def current_vendor() -> int | None:
+    v = session.get("vendor_id")
+    return int(v) if v is not None else None
+
+
+@app.before_request
+def enforce_vendor_session():
+    """One gate in front of everything: no session → no data; wrong vendor in the URL → 403."""
+    path = request.path
+    if path == "/login" or path.startswith("/ui/") or path.startswith("/api/auth/"):
+        return None
+
+    vendor = current_vendor()
+    if vendor is None:
+        return redirect("/login") if path == "/" else (jsonify({"error": "not_authenticated"}), 401)
+
+    m = VENDOR_ROUTE.match(path)
+    if m and int(m.group(1)) != vendor:
+        audit.log(db(), "vendor", vendor, "cross_vendor_denied",
+                  {"path": path, "requested_vendor": int(m.group(1))}, [], None)
+        return jsonify({"error": "forbidden", "detail": "You are signed in as a different vendor."}), 403
+    return None
+
+
+# ----------------------------------------------------------------------------- auth
+@app.get("/login")
+def login_page():
+    return send_from_directory(UI_DIR, "login.html")
+
+
+@app.post("/api/auth/request_otp")
+def auth_request_otp():
+    body = request.get_json(force=True) or {}
+    out = auth.request_otp(body.get("mobile"))
+    return jsonify(out), (200 if out["ok"] else 404)
+
+
+@app.post("/api/auth/verify_otp")
+def auth_verify_otp():
+    body = request.get_json(force=True) or {}
+    c = db()
+    out = auth.verify_otp(c, body.get("mobile"), body.get("otp"))
+    if not out["ok"]:
+        return jsonify(out), 401
+    session.clear()                                   # never carry one vendor's session into another
+    session["vendor_id"] = out["vendor_id"]
+    session["mobile"] = out["mobile"]
+    session["vendor_name"] = out["vendor_name"]
+    session.permanent = False
+    audit.log(c, "vendor", out["vendor_id"], "login", {"mobile": out["mobile"]}, [], None)
+    return jsonify(out)
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+
+@app.get("/api/session")
+def session_info():
+    c = db()
+    v = current_vendor()
+    row = one(c, "SELECT id, name, archetype FROM companies WHERE id=?", (v,)) or abort(404)
+    return jsonify({"vendor": row, "mobile": session.get("mobile")})
 
 
 # ----------------------------------------------------------------------------- shared
@@ -42,10 +121,10 @@ def ui_asset(name: str):
 
 @app.get("/api/meta")
 def meta():
+    """Only the signed-in vendor. The old vendor picker is gone — there is no list to hand out."""
     c = db()
-    return jsonify({
-        "vendors": rows(c, "SELECT id, name, archetype FROM companies WHERE category='vendor' ORDER BY (archetype='generic'), name"),
-    })
+    v = current_vendor()
+    return jsonify({"vendors": rows(c, "SELECT id, name, archetype FROM companies WHERE id=?", (v,))})
 
 
 # ----------------------------------------------------------------------------- vendor (guarded)
@@ -146,8 +225,10 @@ def claude_connect():
 
 @app.get("/api/audit")
 def audit_tail():
+    """Your own trail only — the log holds every vendor's, so it is filtered to the session."""
     c = db()
-    return jsonify(rows(c, "SELECT * FROM audit_log ORDER BY id DESC LIMIT 30"))
+    return jsonify(rows(c, "SELECT * FROM audit_log WHERE persona='vendor' AND actor_id=? ORDER BY id DESC LIMIT 30",
+                        (current_vendor(),)))
 
 
 if __name__ == "__main__":

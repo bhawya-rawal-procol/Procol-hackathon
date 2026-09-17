@@ -28,11 +28,13 @@ in `tests/test_postmortem_and_api.py` prove it. **If those tests fail, the produ
 ```bash
 pip install -r requirements.txt      # Flask, numpy, scikit-learn, requests (pytest optional)
 ./run.sh demo                         # seed → build-facts → serve on http://127.0.0.1:8000
-./run.sh test                         # 50 tests (pytest if installed, else unittest)
+./run.sh test                         # 79 tests (pytest if installed, else unittest)
 ```
 
 `make demo` / `make test` do the same if you prefer make (the Makefile is in the git bundle — see below).
 Individual steps: `./run.sh seed`, `build-facts`, `serve`. Then open `DEMO.md`.
+
+You land on a sign-in page — mobile number + OTP. The five accounts are in `VENDOR_LOGINS.md`.
 
 Git history: `git clone vendor-intelligence.bundle vendor-intelligence-git` gives you the six step commits.
 
@@ -54,10 +56,36 @@ memory only.
 | `VI_ANTHROPIC_MODEL` | `claude-sonnet-4-5` | Model for chat and narration |
 | `VI_PORT` | `8000` | Port for `python -m vi.api` (`--port` still wins) |
 | `VI_DB` | `data/vendor_intelligence.db` | SQLite file |
+| `VI_SECRET` | random per process | Signs the session cookie; set it to survive restarts |
 | `ANTHROPIC_API_URL` | Anthropic Messages API | Only for a proxy or a mock |
 | `VI_ENV_FILE` | `./.env` | Load a different env file |
 
 Changes to `.env` are read at process start, so restart the server after editing it.
+
+## Vendor sign-in (mobile + OTP)
+
+The demo opens on a sign-in page. A vendor enters the mobile number registered to its company and a
+one-time code — the Procol flow, minus the SMS gateway: five accounts are hardcoded in `vi/auth.py`
+with a fixed OTP each.
+
+The five numbers and their codes are in **`VENDOR_LOGINS.md`**. Nothing in the UI or the API hands
+them out: the sign-in page lists no accounts and `request_otp` never returns the code, so the file is
+the only place to read them from.
+
+Accounts are pinned to the **archetype**, not to a row id, so they survive a reseed. An OTP must be
+requested before it can be verified, expires after 5 minutes, and dies after 5 wrong attempts.
+
+**Isolation.** A session carries exactly one `vendor_company_id`. `vi/api.py` refuses any
+`/api/vendor/<id>/…` route whose id is not the session's with a 403 and writes the attempt to
+`audit_log` as `cross_vendor_denied`, so editing the number in the URL gets you nothing. `/api/meta`
+returns only the signed-in vendor (the old vendor picker and its list are gone) and `/api/audit` is
+filtered to your own trail. This sits *in front of* the ConfidentialityGuard, which is unchanged:
+the session decides whose record you are reading, the guard decides what may appear inside it.
+`tests/test_auth.py` covers the OTP flow, that no response leaks a code, and the isolation — anonymous access, cross-vendor GET and
+POST, the audit entry, scoped meta and audit, logout, and all five accounts loading their own data.
+
+Set `VI_SECRET` to keep sessions alive across a server restart; without it each process signs its
+cookies with a fresh random key, which is the safer default for a prototype.
 
 ## The vendor chat assistant
 
@@ -122,12 +150,13 @@ Coastal Chemicals (`none` — demonstrates the guard blanking everything).
 vi/schema.sql                Procol-shaped tables + 3 prototype-only tables (vendor_profiles, post_mortems, audit_log)
 vi/seed/                     world.py (companies, categories, mappings) · archetypes.py · events.py · generate.py
 vi/facts/                    the Vendor-360 SQL and its idempotent builder
+vi/auth.py                   mobile + OTP sign-in for the five demo vendors (numbers: VENDOR_LOGINS.md)
 vi/guard.py                  ConfidentialityGuard
 vi/postmortem/               checks.py · narrator.py · service.py
 vi/priceband.py              own-history price band, buyer purchase band (k-anonymised)
 vi/chat/                     tools.py · offline.py · llm.py · service.py — the vendor assistant
 vi/api.py, vi/vendor_views.py, ui/     Flask API + single-page demo UI
-tests/                       60 tests; conftest.py isolates .env, conftest_db.py seeds a fresh DB once per run
+tests/                       79 tests; conftest.py isolates .env, conftest_db.py seeds a fresh DB once per run
 PORTING.md                   prototype table/query → real Procol table
 DEMO.md                      4-minute click path
 ```
