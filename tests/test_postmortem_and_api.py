@@ -92,9 +92,15 @@ class ApiConfidentiality(unittest.TestCase):
         cls.client = api_mod.app.test_client()
         cls.c = conn()
 
+    def sign_in(self, vendor: int):
+        """Every vendor route needs a session now; the OTP flow itself is covered by test_auth.py."""
+        with self.client.session_transaction() as s:
+            s["vendor_id"] = vendor
+
     def test_vendor_endpoints_never_leak_other_vendor_names(self):
         vendors = [r[0] for r in self.c.execute("SELECT id FROM companies WHERE category='vendor' AND archetype<>'generic'")]
         for v in vendors:
+            self.sign_in(v)
             others = [r[0] for r in self.c.execute("SELECT name FROM companies WHERE category='vendor' AND id<>?", (v,))]
             for path in (f"/api/vendor/{v}/habits", f"/api/vendor/{v}/priceband", f"/api/vendor/{v}/profile"):
                 body = self.client.get(path).get_data(as_text=True)
@@ -108,6 +114,7 @@ class ApiConfidentiality(unittest.TestCase):
 
     def test_policy_flip_removes_and_restores_feedback(self):
         v = vendor_id(self.c, "V-LATE")
+        self.sign_in(v)
         tr = lost_event_for(self.c, v)
         buyer = self.c.execute("SELECT eg.company_id FROM trade_requests tr JOIN event_groups eg ON eg.id=tr.event_group_id WHERE tr.id=?", (tr,)).fetchone()[0]
         def set_policy(policy):
@@ -126,6 +133,7 @@ class ApiConfidentiality(unittest.TestCase):
 
     def test_audit_log_written(self):
         v = vendor_id(self.c, "V-STAR")
+        self.sign_in(v)
         self.client.get(f"/api/vendor/{v}/priceband")
         row = self.c.execute("SELECT persona, action, guard_json FROM audit_log WHERE action='price_band' ORDER BY id DESC LIMIT 1").fetchone()
         self.assertIsNotNone(row)

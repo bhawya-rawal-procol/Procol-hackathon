@@ -1,7 +1,11 @@
 # DEMO — a four-minute click path (vendor)
 
 Run `make demo`, open http://127.0.0.1:8010. One page, one persona: the **vendor**.
-The vendor picker is top-right; archetypes are labelled so you know what each one's story is.
+
+You land on **sign in**: mobile number + OTP, the way a vendor reaches Procol. Five accounts are
+wired up — keep **`VENDOR_LOGINS.md`** open beside you, it has the numbers and codes. Nothing on the
+page reveals them. A session is one vendor and one vendor only, so switching vendor means signing out
+and signing back in as another number.
 
 The product answers a question vendors on Procol have never been able to ask: *why did I lose, and
 what do I change next time?* Everything on the page is the vendor's own record or a relative
@@ -11,7 +15,7 @@ position. A competitor's price, name or rank never reaches this page.
 
 ### 1. The habit that costs the money (60 s)
 
-- Choose **Rathi Metallurgicals Pvt Ltd · V-LATE**.
+- Sign in as **Rathi Metallurgicals · V-LATE** (see `VENDOR_LOGINS.md`).
 - Left panel, **My habits**: *"Counter-offer windows missed: 82%"* in red. That is the whole story in
   one number, and it is a number no vendor can see today.
 - Around it: invites, bid rate, mail open rate, first-bid response time, average gap to L1, extensions
@@ -32,7 +36,7 @@ position. A competitor's price, name or rank never reaches this page.
 ### 3. My winning price band (30 s)
 
 - Right column: per category, win rate by **% gap to L1** bucket, computed from this vendor's own bids only.
-- Switch to **Omkar Industrial Supplies · V-HIGH**: Steel shows **0 wins in the 6–10% and >10% buckets
+- Sign out and back in as **Omkar Industrial Supplies · V-HIGH**: Steel shows **0 wins in the 6–10% and >10% buckets
   across 9 bids**, while inside 3% it wins half. The vendor learns exactly where its price has to be
   without ever seeing a competitor's number.
 

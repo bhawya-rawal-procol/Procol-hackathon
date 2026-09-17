@@ -1,13 +1,18 @@
 /* Vendor Intelligence — vendor analytics console. No framework, no build step. */
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
-const api = async (path, opts) => { const r = await fetch(path, opts); if (!r.ok) throw new Error(await r.text()); return r.json(); };
+const api = async (path, opts) => {
+  const r = await fetch(path, opts);
+  if (r.status === 401) { window.location.href = "/login"; throw new Error("not authenticated"); }
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+};
 const pct = (v) => v == null ? "—" : Math.round(v * 100) + "%";
 const num = (v, d = 1) => v == null ? "—" : Number(v).toFixed(d);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const css = (name, fallback) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 
-const state = { vendor: null, meta: null, events: [], habits: null, profile: null, filter: "bid" };
+const state = { vendor: null, session: null, events: [], habits: null, profile: null, filter: "bid" };
 
 /* card scaffold: head (title + meta) · body · optional footnote */
 function card(el, title, meta, bodyHtml, footHtml) {
@@ -41,12 +46,19 @@ $("#theme-toggle").onclick = () => {
 };
 
 // ------------------------------------------------------------------ boot
+$("#logout").onclick = async () => {
+  await fetch("/api/auth/logout", { method: "POST" });
+  window.location.href = "/login";
+};
+
+/* The vendor is whoever signed in; there is no picker and no other vendor to switch to. */
 (async function boot() {
-  state.meta = await api("/api/meta");
-  $("#vendor-select").innerHTML = state.meta.vendors.map((v) =>
-    `<option value="${v.id}">${esc(v.name)}${v.archetype !== "generic" ? "  ·  " + v.archetype : ""}</option>`).join("");
-  state.vendor = +$("#vendor-select").value;
-  $("#vendor-select").onchange = (e) => { state.vendor = +e.target.value; loadVendor(); };
+  const s = await api("/api/session");
+  state.vendor = s.vendor.id;
+  state.session = s;
+  $("#who-name").textContent = s.vendor.name;
+  $("#who-mobile").textContent = s.mobile ? "+91 " + s.mobile.slice(0, 5) + " " + s.mobile.slice(5) : "";
+  document.title = `${s.vendor.name} · Vendor Intelligence`;
   loadVendor();
 })();
 

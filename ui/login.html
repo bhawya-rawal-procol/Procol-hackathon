@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sign in · Vendor Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/ui/style.css">
+</head>
+<body class="login-body">
+
+<main class="login-wrap">
+  <div class="login-card">
+    <div class="brand login-brand"><span class="logo">VI</span><span>Vendor&nbsp;Intelligence</span></div>
+
+    <!-- step 1 · mobile -->
+    <form id="mobile-form" class="login-step">
+      <h1>Sign in</h1>
+      <p class="fine">Use the mobile number registered to your company on Procol. We'll send a one-time code.</p>
+      <label class="field">
+        <span>Mobile number</span>
+        <div class="mobile-input">
+          <span class="cc">+91</span>
+          <input id="mobile" type="tel" inputmode="numeric" autocomplete="tel" placeholder="10-digit number" maxlength="14" required>
+        </div>
+      </label>
+      <button class="cta block" type="submit" id="mobile-btn">Send OTP</button>
+      <p class="err" id="mobile-err" hidden></p>
+    </form>
+
+    <!-- step 2 · otp -->
+    <form id="otp-form" class="login-step" hidden>
+      <h1>Enter the code</h1>
+      <p class="fine" id="otp-sent"></p>
+      <label class="field">
+        <span>6-digit OTP</span>
+        <input id="otp" class="otp-input" type="text" inputmode="numeric" autocomplete="one-time-code"
+               placeholder="••••••" maxlength="6" required>
+      </label>
+      <button class="cta block" type="submit" id="otp-btn">Verify &amp; continue</button>
+      <div class="otp-foot">
+        <button type="button" class="link" id="change-mobile">Change number</button>
+        <button type="button" class="link" id="resend">Resend code</button>
+      </div>
+      <p class="err" id="otp-err" hidden></p>
+    </form>
+
+    <p class="fine login-foot">Prototype · synthetic data. Each vendor sees only its own record.</p>
+  </div>
+</main>
+
+<script src="/ui/login.js"></script>
+</body>
+</html>
